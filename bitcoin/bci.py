@@ -31,7 +31,7 @@ def is_testnet(inp):
     '''Checks if inp is a testnet address or if UTXO is a known testnet TxID''' 
     if isinstance(inp, (list, tuple)) and len(inp) >= 1:
         return any([is_testnet(x) for x in inp])
-    elif not isinstance(inp, basestring):    # sanity check
+    elif not isinstance(inp, str):    # sanity check
         raise TypeError("Input must be str/unicode, not type %s" % str(type(inp)))
 
     if not inp or (inp.lower() in ("btc", "testnet")): 
@@ -70,7 +70,7 @@ def set_network(*args):
     for arg in args:
         if not arg: 
             pass
-        if isinstance(arg, basestring):
+        if isinstance(arg, str):
             r.append(is_testnet(arg))
         elif isinstance(arg, (list, tuple)):
             return set_network(*arg)
@@ -108,14 +108,14 @@ def bci_unspent(*args):
         try:
             data = make_request('https://blockchain.info/unspent?active='+a)
         except Exception as e:
-            if str(e) == 'No free outputs to spend':
+            if e.args[0] == b'No free outputs to spend':
                 continue
             else:
                 raise Exception(e)
         try:
             jsonobj = json.loads(data.decode("utf-8"))
             for o in jsonobj["unspent_outputs"]:
-                h = o['tx_hash'].decode('hex')[::-1].encode('hex')
+                h = bytes.fromhex(o['tx_hash'])[::-1].hex()
                 u.append({
                     "output": h+':'+str(o['tx_output_n']),
                     "value": o['value']
@@ -259,7 +259,7 @@ def history(*args):
 # Pushes a transaction to the network using https://blockchain.info/pushtx
 def bci_pushtx(tx):
     if not re.match('^[0-9a-fA-F]*$', tx):
-        tx = tx.encode('hex')
+        tx = tx.hex()
     return make_request(
         'https://blockchain.info/pushtx', 
         from_string_to_bytes('tx='+tx)
@@ -268,7 +268,7 @@ def bci_pushtx(tx):
 
 def eligius_pushtx(tx):
     if not re.match('^[0-9a-fA-F]*$', tx):
-        tx = tx.encode('hex')
+        tx = tx.hex()
     s = make_request(
         'http://eligius.st/~wizkid057/newstats/pushtxn.php',
         'transaction='+tx+'&send=Push')
@@ -289,13 +289,13 @@ def blockr_pushtx(tx, network='btc'):
             'Unsupported network {0} for blockr_pushtx'.format(network))
 
     if not re.match('^[0-9a-fA-F]*$', tx):
-        tx = tx.encode('hex')
+        tx = tx.hex()
     return make_request(blockr_url, '{"hex":"%s"}' % tx)
 
 
 def helloblock_pushtx(tx):
     if not re.match('^[0-9a-fA-F]*$', tx):
-        tx = tx.encode('hex')
+        tx = tx.hex()
     return make_request('https://mainnet.helloblock.io/v1/transactions',
                         'rawTxHex='+tx)
 
@@ -327,7 +327,7 @@ def bci_fetchtx(txhash):
     if isinstance(txhash, list):
         return [bci_fetchtx(h) for h in txhash]
     if not re.match('^[0-9a-fA-F]*$', txhash):
-        txhash = txhash.encode('hex')
+        txhash = txhash.hex()
     data = make_request('https://blockchain.info/rawtx/'+txhash+'?format=hex')
     return data
 
@@ -341,13 +341,13 @@ def blockr_fetchtx(txhash, network='btc'):
         raise Exception(
             'Unsupported network {0} for blockr_fetchtx'.format(network))
     if isinstance(txhash, list):
-        txhash = ','.join([x.encode('hex') if not re.match('^[0-9a-fA-F]*$', x)
+        txhash = ','.join([x.hex() if not re.match('^[0-9a-fA-F]*$', x)
                            else x for x in txhash])
         jsondata = json.loads(make_request(blockr_url+txhash).decode("utf-8"))
         return [d['tx']['hex'] for d in jsondata['data']]
     else:
         if not re.match('^[0-9a-fA-F]*$', txhash):
-            txhash = txhash.encode('hex')
+            txhash = txhash.hex()
         jsondata = json.loads(make_request(blockr_url+txhash).decode("utf-8"))
         return jsondata['data']['tx']['hex']
 
@@ -356,7 +356,7 @@ def helloblock_fetchtx(txhash, network='btc'):
     if isinstance(txhash, list):
         return [helloblock_fetchtx(h) for h in txhash]
     if not re.match('^[0-9a-fA-F]*$', txhash):
-        txhash = txhash.encode('hex')
+        txhash = txhash.hex()
     if network == 'testnet':
         url = 'https://testnet.helloblock.io/v1/transactions/'
     elif network == 'btc':
@@ -529,7 +529,7 @@ def get_tx_composite(inputs, outputs, output_value, change_address=None, network
         data["change_address"] = change_address    # 
     jdata = json.loads(make_request(url, data))
     hash, txh = jdata.get("tosign")[0], jdata.get("tosign_tx")[0]
-    assert bin_dbl_sha256(txh.decode('hex')).encode('hex') == hash, "checksum mismatch %s" % hash
+    assert bin_dbl_sha256(bytes.fromhex(txh)).hex() == hash, "checksum mismatch %s" % hash
     return txh.encode("utf-8")
 
 blockcypher_mktx = get_tx_composite

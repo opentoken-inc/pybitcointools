@@ -9,7 +9,7 @@ from _functools import reduce
 def json_is_base(obj, base):
     if not is_python2 and isinstance(obj, bytes):
         return False
-    
+
     alpha = get_code_string(base)
     if isinstance(obj, string_types):
         for i in range(len(obj)):
@@ -58,7 +58,7 @@ def deserialize(tx):
 
     def read_var_int():
         pos[0] += 1
-        
+
         val = from_byte_to_int(tx[pos[0]-1])
         if val < 253:
             return val
@@ -114,7 +114,7 @@ def serialize(txobj):
         o.append(num_to_var_int(len(out["script"]))+out["script"])
     o.append(encode(txobj["locktime"], 256, 4)[::-1])
 
-    return ''.join(o) if is_python2 else reduce(lambda x,y: x+y, o, bytes())
+    return ('' if is_python2 else b'').join(o)
 
 # Hashing transactions for signing
 
@@ -173,9 +173,9 @@ def is_bip66(sig):
     #0x30  [total-len]  0x02  [R-len]  [R]  0x02  [S-len]  [S]  [sighash]
     sig = bytearray.fromhex(sig) if re.match('^[0-9a-fA-F]*$', sig) else bytearray(sig)
     if (sig[0] == 0x30) and (sig[1] == len(sig)-2):     # check if sighash is missing
-            sig.extend(b"\1")		                   	# add SIGHASH_ALL for testing
+        sig.extend(b"\1")                      # add SIGHASH_ALL for testing
     #assert (sig[-1] & 124 == 0) and (not not sig[-1]), "Bad SIGHASH value"
-    
+
     if len(sig) < 9 or len(sig) > 73: return False
     if (sig[0] != 0x30): return False
     if (sig[1] != len(sig)-3): return False
@@ -273,8 +273,8 @@ scriptaddr = p2sh_scriptaddr
 
 def deserialize_script(script):
     if isinstance(script, str) and re.match('^[0-9a-fA-F]*$', script):
-       return json_changebase(deserialize_script(binascii.unhexlify(script)),
-                              lambda x: safe_hexlify(x))
+        return json_changebase(deserialize_script(binascii.unhexlify(script)),
+                               lambda x: safe_hexlify(x))
     out, pos = [], 0
     while pos < len(script):
         code = from_byte_to_int(script[pos])
@@ -328,7 +328,7 @@ else:
         if json_is_base(script, 16):
             return safe_hexlify(serialize_script(json_changebase(script,
                                     lambda x: binascii.unhexlify(x))))
-        
+
         result = bytes()
         for b in map(serialize_script_unit, script):
             result += b if isinstance(b, bytes) else bytes(b, 'utf-8')
@@ -360,17 +360,17 @@ def verify_tx_input(tx, i, script, sig, pub):
 
 def sign(tx, i, priv, hashcode=SIGHASH_ALL):
     i = int(i)
-    if (not is_python2 and isinstance(re, bytes)) or not re.match('^[0-9a-fA-F]*$', tx):
+    if isinstance(tx, bytes) or not re.match('^[0-9a-fA-F]*$', tx):
         return binascii.unhexlify(sign(safe_hexlify(tx), i, priv))
     if len(priv) <= 33:
         priv = safe_hexlify(priv)
     pub = privkey_to_pubkey(priv)
     address = pubkey_to_address(pub)
     signing_tx = signature_form(tx, i, mk_pubkey_script(address), hashcode)
-    sig = ecdsa_tx_sign(signing_tx, priv, hashcode)
-    txobj = deserialize(tx)
+    sig = bytes.fromhex(ecdsa_tx_sign(signing_tx, priv, hashcode))
+    txobj = deserialize(bytes.fromhex(tx))
     txobj["ins"][i]["script"] = serialize_script([sig, pub])
-    return serialize(txobj)
+    return serialize(txobj).hex()
 
 
 def signall(tx, priv):
@@ -436,7 +436,10 @@ def mktx(*args):
             if isinstance(i, dict) and "output" in i:
                 i = i["output"]
             txobj["ins"].append({
-                "outpoint": {"hash": i[:64], "index": int(i[65:])},
+                "outpoint": {
+                    "hash": bytes.fromhex(i[:64]),
+                    "index": int(i[65:])
+                },
                 "script": "",
                 "sequence": 4294967295
             })
@@ -453,7 +456,7 @@ def mktx(*args):
 
         outobj = {}
         if "address" in o:
-            outobj["script"] = address_to_script(o["address"])
+            outobj["script"] = bytes.fromhex(address_to_script(o["address"]))
         elif "script" in o:
             outobj["script"] = o["script"]
         else:

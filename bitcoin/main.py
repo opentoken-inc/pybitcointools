@@ -288,21 +288,21 @@ def decompress(pubkey):
         return encode_pubkey(decode_pubkey(pubkey, f), 'hex')
 
 
-def privkey_to_pubkey(privkey):
+def privkey_to_pubkey(privkey, formt='bin'):
     f = get_privkey_format(privkey)
     privkey = decode_privkey(privkey, f)
     if privkey >= N:
         raise Exception("Invalid privkey")
-    if f in ['bin', 'bin_compressed', 'hex', 'hex_compressed', 'decimal']:
-        return encode_pubkey(fast_multiply(G, privkey), f)
+    if formt in ['bin', 'bin_compressed', 'hex', 'hex_compressed', 'decimal']:
+        return encode_pubkey(fast_multiply(G, privkey), formt)
     else:
-        return encode_pubkey(fast_multiply(G, privkey), f.replace('wif', 'hex'))
+        return encode_pubkey(fast_multiply(G, privkey), formt.replace('wif', 'hex'))
 
 privtopub = privkey_to_pubkey
 
 
-def privkey_to_address(priv, magicbyte=0):
-    return pubkey_to_address(privkey_to_pubkey(priv), magicbyte)
+def privkey_to_address(priv, magicbyte=0, formt='bin'):
+    return pubkey_to_address(privkey_to_pubkey(priv, formt), magicbyte, formt)
 privtoaddr = privkey_to_address
 
 
@@ -447,9 +447,9 @@ def b58check_to_hex(inp):
     return safe_hexlify(b58check_to_bin(inp))
 
 
-def pubkey_to_address(pubkey, magicbyte=0):
+def pubkey_to_address(pubkey, magicbyte=0, formt='bin'):
     if isinstance(pubkey, (list, tuple)):
-        pubkey = encode_pubkey(pubkey, 'bin')
+        pubkey = encode_pubkey(pubkey, formt)
     if len(pubkey) in [66, 130]:
         return bin_to_b58check(
             bin_hash160(binascii.unhexlify(pubkey)), magicbyte)
